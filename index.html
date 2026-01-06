@@ -225,7 +225,10 @@
         </div>
         
         <div class="sidebar-footer">
-            <button class="btn btn-primary" style="width:100%" onclick="exportData()">Submit</button>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-sec" style="flex:1; border-color:#fee2e2; color:#ef4444;" onclick="triggerReset()">Reset</button>
+                <button class="btn btn-primary" style="flex:2;" onclick="exportData()">Submit</button>
+            </div>
         </div>
     </div>
 
