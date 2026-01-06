@@ -322,10 +322,90 @@
     let form = { imgs: [], opts: [], selectedCols: [] };
     let step = 1;
 
+    // --- PERSISTENCE START ---
+    function saveProgress() {
+        const draft = {
+            title: document.getElementById('pTitle').value,
+            vendor: document.getElementById('pVendor').value,
+            desc: document.getElementById('pDesc').innerHTML,
+            price: document.getElementById('pPrice').value,
+            compare: document.getElementById('pCompare').value,
+            sku: document.getElementById('pSku').value,
+            qty: document.getElementById('pQty').value,
+            newCat: document.getElementById('newCat').value
+        };
+        const data = { state, form, step, draft, timestamp: Date.now() };
+        localStorage.setItem('bh_workspace', JSON.stringify(data));
+    }
+
+    function loadProgress() {
+        const raw = localStorage.getItem('bh_workspace');
+        if(!raw) return;
+        try {
+            const data = JSON.parse(raw);
+            state = data.state || state;
+            form = data.form || form;
+            
+            // Restore UI for State
+            if(state.brand) {
+                document.getElementById('setupLayer').style.display = 'none';
+                document.getElementById('setupBrand').value = state.brand;
+                if(state.type === 'multi') {
+                    document.getElementById('vendorBox').classList.remove('hidden');
+                    // Visually select Multi
+                    document.querySelectorAll('.mode-opt').forEach(x => x.classList.remove('active'));
+                    document.querySelectorAll('.mode-opt')[1].classList.add('active');
+                }
+            }
+
+            // Restore Draft Inputs
+            if(data.draft) {
+                document.getElementById('pTitle').value = data.draft.title || '';
+                document.getElementById('pVendor').value = data.draft.vendor || '';
+                document.getElementById('pDesc').innerHTML = data.draft.desc || '';
+                document.getElementById('pPrice').value = data.draft.price || '';
+                document.getElementById('pCompare').value = data.draft.compare || '';
+                document.getElementById('pSku').value = data.draft.sku || '';
+                document.getElementById('pQty').value = data.draft.qty || '100';
+                document.getElementById('newCat').value = data.draft.newCat || '';
+            }
+
+            // Render Everything
+            renderList();
+            renderCollections();
+            renderOpts();
+            renderImages();
+            
+            // Navigate to saved step
+            updateStepUI(data.step || 1);
+
+        } catch(e) {
+            console.error("Load failed", e);
+            localStorage.removeItem('bh_workspace'); // Clear corrupted data
+        }
+    }
+
+    // Auto-save debouncer
+    let saveTimer;
+    function autoSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveProgress, 1000);
+    }
+    
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+        loadProgress();
+        // Attach listeners for auto-save
+        document.querySelectorAll('input, select').forEach(el => el.addEventListener('input', autoSave));
+        document.getElementById('pDesc').addEventListener('input', autoSave);
+    });
+    // --- PERSISTENCE END ---
+
     function setMode(t, e) {
         state.type = t;
         document.querySelectorAll('.mode-opt').forEach(x => x.classList.remove('active'));
         e.classList.add('active');
+        saveProgress();
     }
     function finishSetup() {
         const b = document.getElementById('setupBrand').value;
@@ -335,6 +415,7 @@
         if(state.type === 'multi') document.getElementById('vendorBox').classList.remove('hidden');
         renderCollections();
         addOptionRow();
+        saveProgress();
     }
     function toggleSidebar() {
         document.getElementById('sidebar').classList.toggle('open');
@@ -344,11 +425,13 @@
     function navTo(target) {
         if(target > step && step === 1 && !document.getElementById('pTitle').value) return alert("Please enter Product Name");
         updateStepUI(target);
+        saveProgress();
     }
     function changeStep(dir) {
         const next = step + dir;
         if(next > 3) { saveProduct(); return; }
         updateStepUI(next);
+        saveProgress();
     }
     function updateStepUI(target) {
         document.querySelectorAll('.step-content').forEach(e => e.classList.add('hidden'));
@@ -389,6 +472,7 @@
             if(!form.selectedCols.includes(val)) form.selectedCols.push(val);
             document.getElementById('newCat').value = '';
             renderCollections();
+            saveProgress();
         }
     }
     function renderCollections() {
@@ -401,21 +485,23 @@
         if(form.selectedCols.includes(col)) form.selectedCols = form.selectedCols.filter(c => c !== col);
         else form.selectedCols.push(col);
         renderCollections();
+        saveProgress();
     }
 
     function addOptionRow() {
         if(form.opts.length >= 3) return;
         form.opts.push({n:'', v:''});
         renderOpts();
+        saveProgress();
     }
     function renderOpts() {
         const d = document.getElementById('variantList');
         if(form.opts.length === 0) return d.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:0.9rem;">No options.</div>';
         d.innerHTML = form.opts.map((o,i) => `
             <div style="display:grid; grid-template-columns:1fr 2fr 30px; gap:10px; margin-bottom:10px;">
-                <input type="text" placeholder="Name (Size)" value="${o.n}" onchange="form.opts[${i}].n=this.value">
-                <input type="text" placeholder="Values (S, M, L)" value="${o.v}" onchange="form.opts[${i}].v=this.value">
-                <i class="fa-solid fa-trash" onclick="form.opts.splice(${i},1);renderOpts()" style="color:#ef4444; cursor:pointer; margin-top:12px;"></i>
+                <input type="text" placeholder="Name (Size)" value="${o.n}" onchange="form.opts[${i}].n=this.value; saveProgress()">
+                <input type="text" placeholder="Values (S, M, L)" value="${o.v}" onchange="form.opts[${i}].v=this.value; saveProgress()">
+                <i class="fa-solid fa-trash" onclick="form.opts.splice(${i},1);renderOpts(); saveProgress()" style="color:#ef4444; cursor:pointer; margin-top:12px;"></i>
             </div>
         `).join('');
     }
@@ -435,6 +521,7 @@
     function removeImg(i) {
         form.imgs.splice(i, 1);
         renderImages();
+        saveProgress();
     }
 
     async function uploadFiles() {
@@ -453,6 +540,7 @@
                 if(d.success) {
                     form.imgs.push(d.data.url);
                     renderImages();
+                    saveProgress();
                 } else {
                     errors++;
                 }
@@ -491,6 +579,7 @@
         renderList();
         reset();
         alert("Product Saved to Queue!");
+        saveProgress();
     }
 
     function dupe(i) {
@@ -508,6 +597,7 @@
         renderCollections(); renderOpts(); renderImages();
         updateStepUI(1);
         if(window.innerWidth <= 768) toggleSidebar();
+        saveProgress();
     }
 
     function reset() {
@@ -521,6 +611,7 @@
         form.imgs = []; form.opts = []; form.selectedCols = [];
         renderCollections(); renderOpts(); renderImages();
         updateStepUI(1);
+        saveProgress();
     }
 
     function renderList() {
@@ -530,7 +621,7 @@
             <div class="p-card">
                 <div class="card-actions">
                     <button class="btn-icon" onclick="dupe(${i})" title="Duplicate"><i class="fa-regular fa-copy"></i></button>
-                    <button class="btn-icon" onclick="state.products.splice(${i},1);renderList()" style="color:#ef4444;" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn-icon" onclick="state.products.splice(${i},1);renderList(); saveProgress()" style="color:#ef4444;" title="Delete"><i class="fa-solid fa-trash"></i></button>
                 </div>
                 <div style="font-weight:700; padding-right:60px;">${p.title}</div>
                 <div style="font-size:0.85rem; color:#64748b; margin-top:4px;">₹${p.price}</div>
