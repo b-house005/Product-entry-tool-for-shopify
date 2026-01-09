@@ -301,7 +301,7 @@
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                         <div><label>Stock Code (SKU) <span class="info-tip" data-text="Unique code to track inventory.">!</span></label><input type="text" id="pSku" placeholder="ABC-001"></div>
-                        <div><label>Total Quantity</label><input type="number" id="pQty" value="100"></div>
+                        <div><label>Total Quantity</label><input type="number" id="pQty" value="0"></div>
                     </div>
                     <hr style="margin:30px 0; border:0; border-top:1px solid #e2e8f0;">
                     
@@ -432,7 +432,7 @@
                 document.getElementById('pPrice').value = data.draft.price || '';
                 document.getElementById('pCompare').value = data.draft.compare || '';
                 document.getElementById('pSku').value = data.draft.sku || '';
-                document.getElementById('pQty').value = data.draft.qty || '100';
+                document.getElementById('pQty').value = (data.draft.qty ?? '0');
                 document.getElementById('newCat').value = data.draft.newCat || '';
             }
 
@@ -480,7 +480,6 @@
         document.getElementById('setupLayer').style.display='none';
         if(state.type === 'multi') document.getElementById('vendorBox').classList.remove('hidden');
         renderCollections();
-        addOptionRow();
         saveProgress();
     }
     function toggleSidebar() {
@@ -673,7 +672,7 @@
         document.getElementById('pPrice').value = '';
         document.getElementById('pCompare').value = '';
         document.getElementById('pSku').value = '';
-        document.getElementById('pQty').value = '100';
+        document.getElementById('pQty').value = '0';
         form.imgs = []; form.opts = []; form.selectedCols = [];
         renderCollections(); renderOpts(); renderImages();
         updateStepUI(1);
@@ -778,7 +777,7 @@
                         });
                     });
                 }
-            } else { vars.push({o1n:"Title", o1v:"Default Title"}); }
+            } else { vars.push({}); }
 
             const imgs = Array.isArray(p.imgs) ? p.imgs.filter(Boolean) : [];
             const firstImg = imgs[0] || "";
@@ -804,19 +803,19 @@
                 rowObj["Option3 value"] = v.o3v || "";
 
                 const optVals = [v.o1v, v.o2v, v.o3v].filter(Boolean);
-                rowObj["SKU"] = v.o1v ? buildVariantSku(p.sku, optVals) : "";
-                rowObj["Price"] = v.o1v ? numStr(p.price) : "";
-                rowObj["Compare-at price"] = v.o1v ? numStr(p.compare) : "";
-                rowObj["Inventory tracker"] = v.o1v ? "shopify" : "";
-                rowObj["Inventory quantity"] = v.o1v ? numStr(p.qty) : "";
-                rowObj["Continue selling when out of stock"] = v.o1v ? "FALSE" : "";
-                rowObj["Charge tax"] = v.o1v ? "TRUE" : "";
-                rowObj["Requires shipping"] = v.o1v ? "TRUE" : "";
-                rowObj["Fulfillment service"] = v.o1v ? "manual" : "";
+                rowObj["SKU"] = buildVariantSku(p.sku, optVals);
+                rowObj["Price"] = numStr(p.price);
+                rowObj["Compare-at price"] = numStr(p.compare);
+                rowObj["Inventory tracker"] = "shopify";
+                rowObj["Inventory quantity"] = numStr(p.qty);
+                rowObj["Continue selling when out of stock"] = "FALSE";
+                rowObj["Charge tax"] = "TRUE";
+                rowObj["Requires shipping"] = "TRUE";
+                rowObj["Fulfillment service"] = "manual";
 
                 rowObj["Product image URL"] = f ? firstImg : "";
                 rowObj["Image position"] = f && firstImg ? "1" : "";
-                rowObj["Variant image URL"] = v.o1v ? firstImg : "";
+                rowObj["Variant image URL"] = firstImg;
 
                 const row = columns.map(c => esc(rowObj[c] || ""));
                 csv += row.join(",") + "\n";
