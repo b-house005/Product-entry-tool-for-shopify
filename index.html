@@ -719,13 +719,50 @@
 
     function exportData() {
         if(state.products.length === 0) return alert("Nothing to submit");
-        // Correct Headers for Shopify
-        let csv = "Title,URL handle,Description,Vendor,Product category,Type,Tags,Published on online store,Status,SKU,Barcode,Option1 name,Option1 value,Option2 name,Option2 value,Option3 name,Option3 value,Price,Price / International,Compare-at price,Compare-at price / International,Cost per item,Charge tax,Tax code,Unit price total measure,Unit price total measure unit,Unit price base measure,Unit price base measure unit,Inventory tracker,Inventory quantity,Continue selling when out of stock,Weight value (grams),Weight unit for display,Requires shipping,Fulfillment service,Product image URL,Image position,Image alt text,Variant image URL,Gift card,SEO title,SEO description,Google Shopping / Google product category,Google Shopping / Gender,Google Shopping / Age group,Google Shopping / MPN,Google Shopping / AdWords Grouping,Google Shopping / AdWords labels,Google Shopping / Condition,Google Shopping / Custom product,Google Shopping / Custom label 0,Google Shopping / Custom label 1,Google Shopping / Custom label 2,Google Shopping / Custom label 3,Google Shopping / Custom label 4\n";
+        const headerLine = "Title,URL handle,Description,Vendor,Product category,Type,Tags,Published on online store,Status,SKU,Barcode,Option1 name,Option1 value,Option2 name,Option2 value,Option3 name,Option3 value,Price,Price / International,Compare-at price,Compare-at price / International,Cost per item,Charge tax,Tax code,Unit price total measure,Unit price total measure unit,Unit price base measure,Unit price base measure unit,Inventory tracker,Inventory quantity,Continue selling when out of stock,Weight value (grams),Weight unit for display,Requires shipping,Fulfillment service,Product image URL,Image position,Image alt text,Variant image URL,Gift card,SEO title,SEO description,Google Shopping / Google product category,Google Shopping / Gender,Google Shopping / Age group,Google Shopping / MPN,Google Shopping / AdWords Grouping,Google Shopping / AdWords labels,Google Shopping / Condition,Google Shopping / Custom product,Google Shopping / Custom label 0,Google Shopping / Custom label 1,Google Shopping / Custom label 2,Google Shopping / Custom label 3,Google Shopping / Custom label 4";
+        const columns = headerLine.split(',');
+        let csv = headerLine + "\n";
         const esc = t => `"${(t||"").toString().replace(/"/g, '""')}"`;
+        const slugify = (t) => {
+            const s = (t || "").toString().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            return s || "product";
+        };
+        const makeUniqueHandle = (base, used) => {
+            let h = base;
+            let n = 2;
+            while(used.has(h)) { h = `${base}-${n}`; n++; }
+            used.add(h);
+            return h;
+        };
+        const numStr = (v) => {
+            const s = (v ?? "").toString().trim();
+            if(!s) return "";
+            const n = Number(s);
+            return Number.isFinite(n) ? s : "";
+        };
+        const skuPart = (t) => (t || "").toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const buildVariantSku = (baseSku, vals) => {
+            const b = (baseSku || "").toString().trim();
+            if(!b) return "";
+            const parts = (vals || []).map(skuPart).filter(Boolean);
+            if(parts.length === 0) return b;
+            return `${b}-${parts.join('-')}`;
+        };
 
+        const errors = [];
+        state.products.forEach((p, idx) => {
+            const label = p && p.title ? p.title : `#${idx+1}`;
+            if(!p || !p.title) errors.push(`${label}: Title missing`);
+            const v = (p && p.vendor) ? p.vendor.toString().trim() : "";
+            if(!v) errors.push(`${label}: Vendor missing`);
+            if(!numStr(p && p.price)) errors.push(`${label}: Price missing/invalid`);
+            if(!numStr(p && p.qty)) errors.push(`${label}: Inventory quantity missing/invalid`);
+        });
+        if(errors.length) return alert("Fix these before export:\n\n" + errors.slice(0, 20).join("\n") + (errors.length > 20 ? `\n...and ${errors.length-20} more` : ""));
+
+        const usedHandles = new Set();
         state.products.forEach(p => {
-            // Fix Handle generation: no trailing dashes, lower case
-            const h = p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            const h = makeUniqueHandle(slugify(p.title), usedHandles);
             let vars = [];
             let activeOpts = p.opts.filter(o => o.n && o.v);
             
@@ -743,52 +780,54 @@
                 }
             } else { vars.push({o1n:"Title", o1v:"Default Title"}); }
 
-            const max = Math.max(vars.length, p.imgs.length);
-            for(let i=0; i<max; i++) {
+            const imgs = Array.isArray(p.imgs) ? p.imgs.filter(Boolean) : [];
+            const firstImg = imgs[0] || "";
+
+            for(let i=0; i<vars.length; i++) {
                 let v = vars[i] || {};
-                let img = p.imgs[i] || "";
                 let f = (i===0);
-                
-                // Construct Row with correct indices
-                let row = [
-                    f ? esc(p.title) : "",      // 0: Title
-                    esc(h),                     // 1: URL Handle (REQUIRED on all rows)
-                    f ? esc(p.desc) : "",       // 2: Description
-                    f ? esc(p.vendor) : "",     // 3: Vendor
-                    "",                         // 4: Product Category
-                    "",                         // 5: Type
-                    f ? esc(p.cats.join(',')) : "", // 6: Tags
-                    "TRUE",                     // 7: Published
-                    "active",                   // 8: Status
-                    v.o1v ? esc(p.sku) : "",    // 9: SKU
-                    "",                         // 10: Barcode
-                    esc(v.o1n||""), esc(v.o1v||""), // 11, 12: Opt1
-                    esc(v.o2n||""), esc(v.o2v||""), // 13, 14: Opt2
-                    esc(v.o3n||""), esc(v.o3v||""), // 15, 16: Opt3
-                    v.o1v ? p.price : "",       // 17: Price
-                    "",                         // 18: Price / Int
-                    v.o1v ? p.compare : "",     // 19: Compare Price
-                    "",                         // 20: Compare / Int
-                    "",                         // 21: Cost
-                    "",                         // 22: Tax
-                    "",                         // 23: Tax Code
-                    "",                         // 24: Unit Price
-                    "",                         // 25: Unit Price Unit
-                    "",                         // 26: Base Measure
-                    "",                         // 27: Base Measure Unit
-                    "shopify",                  // 28: Inventory Tracker
-                    v.o1v ? p.qty : "",         // 29: Inventory Qty
-                    "continue",                 // 30: Continue selling
-                    "",                         // 31: Weight
-                    "kg",                       // 32: Weight Unit
-                    "TRUE",                     // 33: Requires Shipping
-                    "manual",                   // 34: Fulfillment
-                    esc(img),                   // 35: Image URL
-                    img ? (i+1) : "",           // 36: Image Position
-                    "",                         // 37: Alt Text
-                    ""                          // 38: Variant Image
-                ];
-                
+                const rowObj = {};
+
+                rowObj["Title"] = f ? p.title : "";
+                rowObj["URL handle"] = h;
+                rowObj["Description"] = f ? p.desc : "";
+                rowObj["Vendor"] = f ? p.vendor : "";
+                rowObj["Tags"] = f ? p.cats.join(',') : "";
+                rowObj["Published on online store"] = f ? "TRUE" : "";
+                rowObj["Status"] = f ? "active" : "";
+
+                rowObj["Option1 name"] = v.o1n || "";
+                rowObj["Option1 value"] = v.o1v || "";
+                rowObj["Option2 name"] = v.o2n || "";
+                rowObj["Option2 value"] = v.o2v || "";
+                rowObj["Option3 name"] = v.o3n || "";
+                rowObj["Option3 value"] = v.o3v || "";
+
+                const optVals = [v.o1v, v.o2v, v.o3v].filter(Boolean);
+                rowObj["SKU"] = v.o1v ? buildVariantSku(p.sku, optVals) : "";
+                rowObj["Price"] = v.o1v ? numStr(p.price) : "";
+                rowObj["Compare-at price"] = v.o1v ? numStr(p.compare) : "";
+                rowObj["Inventory tracker"] = v.o1v ? "shopify" : "";
+                rowObj["Inventory quantity"] = v.o1v ? numStr(p.qty) : "";
+                rowObj["Continue selling when out of stock"] = v.o1v ? "FALSE" : "";
+                rowObj["Charge tax"] = v.o1v ? "TRUE" : "";
+                rowObj["Requires shipping"] = v.o1v ? "TRUE" : "";
+                rowObj["Fulfillment service"] = v.o1v ? "manual" : "";
+
+                rowObj["Product image URL"] = f ? firstImg : "";
+                rowObj["Image position"] = f && firstImg ? "1" : "";
+                rowObj["Variant image URL"] = v.o1v ? firstImg : "";
+
+                const row = columns.map(c => esc(rowObj[c] || ""));
+                csv += row.join(",") + "\n";
+            }
+
+            for(let j=1; j<imgs.length; j++) {
+                const rowObj = {};
+                rowObj["URL handle"] = h;
+                rowObj["Product image URL"] = imgs[j];
+                rowObj["Image position"] = String(j + 1);
+                const row = columns.map(c => esc(rowObj[c] || ""));
                 csv += row.join(",") + "\n";
             }
         });
@@ -797,7 +836,12 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "BrandHackers_Submission.csv";
+        const safeBrand = (state.brand || "BrandHackers").toString().trim().replace(/[\\\/:*?"<>|]+/g, '').replace(/\s+/g, '_').slice(0, 60) || "BrandHackers";
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        a.download = `${safeBrand}_Products_${y}-${m}-${d}.csv`;
         a.click();
         
         if(window.innerWidth <= 768 && document.getElementById('sidebar').classList.contains('open')) {
@@ -809,4 +853,5 @@
 </script>
 </body>
 </html>
+
 
