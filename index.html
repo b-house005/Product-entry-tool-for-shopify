@@ -302,6 +302,7 @@
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                         <div><label>Stock Code (SKU) <span class="info-tip" data-text="Unique code to track inventory.">!</span></label><input type="text" id="pSku" placeholder="ABC-001"></div>
                         <div><label>Total Quantity</label><input type="number" id="pQty" value="0"></div>
+                        <div><label>Weight (g)</label><input type="number" id="pWeight" placeholder="0"></div>
                     </div>
                     <hr style="margin:30px 0; border:0; border-top:1px solid #e2e8f0;">
                     
@@ -398,6 +399,7 @@
             compare: document.getElementById('pCompare').value,
             sku: document.getElementById('pSku').value,
             qty: document.getElementById('pQty').value,
+            weight: document.getElementById('pWeight').value,
             newCat: document.getElementById('newCat').value
         };
         const data = { state, form, step, draft, timestamp: Date.now() };
@@ -433,6 +435,7 @@
                 document.getElementById('pCompare').value = data.draft.compare || '';
                 document.getElementById('pSku').value = data.draft.sku || '';
                 document.getElementById('pQty').value = (data.draft.qty ?? '0');
+                document.getElementById('pWeight').value = (data.draft.weight ?? '0');
                 document.getElementById('newCat').value = data.draft.newCat || '';
             }
 
@@ -638,6 +641,7 @@
             compare: document.getElementById('pCompare').value,
             sku: document.getElementById('pSku').value,
             qty: document.getElementById('pQty').value,
+            weight: document.getElementById('pWeight').value,
             opts: JSON.parse(JSON.stringify(form.opts)),
             imgs: [...form.imgs]
         });
@@ -656,6 +660,7 @@
         document.getElementById('pCompare').value = p.compare;
         document.getElementById('pSku').value = p.sku;
         document.getElementById('pQty').value = p.qty;
+        document.getElementById('pWeight').value = p.weight;
         form.opts = JSON.parse(JSON.stringify(p.opts));
         form.selectedCols = [...p.cats];
         form.imgs = [...p.imgs];
@@ -673,6 +678,7 @@
         document.getElementById('pCompare').value = '';
         document.getElementById('pSku').value = '';
         document.getElementById('pQty').value = '0';
+        document.getElementById('pWeight').value = '0';
         form.imgs = []; form.opts = []; form.selectedCols = [];
         renderCollections(); renderOpts(); renderImages();
         updateStepUI(1);
@@ -718,7 +724,7 @@
 
     function exportData() {
         if(state.products.length === 0) return alert("Nothing to submit");
-        const headerLine = "Title,URL handle,Description,Vendor,Product category,Type,Tags,Published on online store,Status,SKU,Barcode,Option1 name,Option1 value,Option2 name,Option2 value,Option3 name,Option3 value,Price,Price / International,Compare-at price,Compare-at price / International,Cost per item,Charge tax,Tax code,Unit price total measure,Unit price total measure unit,Unit price base measure,Unit price base measure unit,Inventory tracker,Inventory quantity,Continue selling when out of stock,Weight value (grams),Weight unit for display,Requires shipping,Fulfillment service,Product image URL,Image position,Image alt text,Variant image URL,Gift card,SEO title,SEO description,Google Shopping / Google product category,Google Shopping / Gender,Google Shopping / Age group,Google Shopping / MPN,Google Shopping / AdWords Grouping,Google Shopping / AdWords labels,Google Shopping / Condition,Google Shopping / Custom product,Google Shopping / Custom label 0,Google Shopping / Custom label 1,Google Shopping / Custom label 2,Google Shopping / Custom label 3,Google Shopping / Custom label 4";
+        const headerLine = "Title,URL handle,Description,Vendor,Product category,Type,Tags,Published on online store,Status,SKU,Barcode,Option1 name,Option1 value,Option2 name,Option2 value,Option3 name,Option3 value,Price,Price / International,Compare-at price,Compare-at price / International,Cost per item,Charge tax,Tax code,Unit price total measure,Unit price total measure unit,Unit price base measure,Unit price base measure unit,Inventory tracker,Inventory quantity,Continue selling when out of stock,Variant Grams,Variant Weight Unit,Requires shipping,Fulfillment service,Product image URL,Image position,Image alt text,Variant image URL,Gift card,SEO title,SEO description,Google Shopping / Google product category,Google Shopping / Gender,Google Shopping / Age group,Google Shopping / MPN,Google Shopping / AdWords Grouping,Google Shopping / AdWords labels,Google Shopping / Condition,Google Shopping / Custom product,Google Shopping / Custom label 0,Google Shopping / Custom label 1,Google Shopping / Custom label 2,Google Shopping / Custom label 3,Google Shopping / Custom label 4";
         const columns = headerLine.split(',');
         let csv = headerLine + "\n";
         const esc = t => `"${(t||"").toString().replace(/"/g, '""')}"`;
@@ -809,6 +815,8 @@
                 rowObj["Inventory tracker"] = "shopify";
                 rowObj["Inventory quantity"] = numStr(p.qty);
                 rowObj["Continue selling when out of stock"] = "FALSE";
+                rowObj["Variant Grams"] = numStr(p.weight);
+                rowObj["Variant Weight Unit"] = "g";
                 rowObj["Charge tax"] = "TRUE";
                 rowObj["Requires shipping"] = "TRUE";
                 rowObj["Fulfillment service"] = "manual";
